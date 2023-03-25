@@ -5,4 +5,3 @@ This is a little fun project in which I tried to simulate a (very) simple Dyson 
 (using Flask framework for the backend, HTML and Three.js for the frontend).
 
 You can also notice some spikes coming out of the Dyson sphere, which are supposed to simulate the sun rays.
-
