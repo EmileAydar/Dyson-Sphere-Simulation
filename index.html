@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Spinning Dyson Sphere</title>
+    <style>
+      body { margin: 0; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      // Set up the scene, camera, and renderer
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Fetch the Dyson sphere model data
+      async function fetchModelData() {
+        const response = await fetch('/model');
+        return await response.json();
+      }
+
+      // Create the Dyson sphere mesh
+      async function createDysonSphere() {
+        const modelData = await fetchModelData();
+        const geometry = new THREE.BufferGeometry();
+        geometry.setFromPoints(modelData.vertices.map(v => new THREE.Vector3(...v)));
+        
+        // Set the index using a BufferAttribute
+        geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(modelData.faces.flat()), 1));
+
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+        return new THREE.Mesh(geometry, material);
+      }
+
+      // Initialize and animate the scene
+      async function init() {
+        const dysonSphere = await createDysonSphere();
+        scene.add(dysonSphere);
+        
+        camera.position.z = 5;
+
+        const animate = function () {
+          requestAnimationFrame(animate);
+
+          dysonSphere.rotation.x += 0.01;
+          dysonSphere.rotation.y += 0.01;
+
+          renderer.render(scene, camera);
+        };
+
+        animate();
+      }
+
+      init();
+    </script>
+  </body>
+</html>
