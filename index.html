@@ -1,60 +1,170 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Spinning Dyson Sphere</title>
-    <style>
-      body { margin: 0; }
-      canvas { display: block; }
-    </style>
-  </head>
-  <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-      // set up the scene, camera, and renderer
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      const renderer = new THREE.WebGLRenderer();
+<head>
+  <meta charset="utf-8">
+  <title>Dyson Shell with Dynamic Metal Rings & Pulsing Glowing Sun</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- Include Three.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+    
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 3000);
+    camera.position.set(0, 0, 1000);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    
+    const cubeTextureLoader = new THREE.CubeTextureLoader();
+    const envMap = cubeTextureLoader.setPath('https://threejs.org/examples/textures/cube/Bridge2/').load([
+      'posx.jpg', 'negx.jpg',
+      'posy.jpg', 'negy.jpg',
+      'posz.jpg', 'negz.jpg'
+    ]);
+    scene.environment = envMap;
+    
+    function createGlowingSunTexture() {
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const center = size / 2;
+      const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
+      gradient.addColorStop(0, 'rgba(255,238,51,1)'); 
+      gradient.addColorStop(0.4, 'rgba(255,238,51,0.8)');
+      gradient.addColorStop(0.8, 'rgba(255,238,51,0.3)');
+      gradient.addColorStop(1, 'rgba(255,238,51,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+      return new THREE.CanvasTexture(canvas);
+    }
+    const sunTexture = createGlowingSunTexture();
+    const sunMaterial = new THREE.SpriteMaterial({
+      map: sunTexture,
+      blending: THREE.AdditiveBlending,
+      transparent: true
+   
+    });
+    const sunSprite = new THREE.Sprite(sunMaterial);
+    const baseSunScale = 300;  
+    sunSprite.scale.set(baseSunScale, baseSunScale, 1);
+    sunSprite.position.set(0, 0, 0);
+    sunSprite.renderOrder = 0;
+    scene.add(sunSprite);
+    
+    const ringsGroup = new THREE.Group();
+    ringsGroup.renderOrder = 1;
+    scene.add(ringsGroup);
+    
+    // params for rings
+    const numRings = 8;              // total rings forming the shell
+    const baseRadius = 300;          // base inner radius for the innermost ring
+    const tubeRadius = 20;           // thickness of each ring
+    const gap = 5;                   // gap between rings
+    const tubularSegments = 300;     // smoothness of the tube
+    const radialSegments = 16;       // cross-sectional detail
+    const closed = true;             // closed loop
+    const uniformColor = 0xCCCCCC;   // light grey tone
+    
+
+    class CircleCurve extends THREE.Curve {
+      constructor(radius) {
+        super();
+        this.radius = radius;
+      }
+      getPoint(t) {
+        const angle = t * Math.PI * 2;
+        const x = this.radius * Math.cos(angle);
+        const y = this.radius * Math.sin(angle);
+        return new THREE.Vector3(x, y, 0);
+      }
+    }
+    
+
+    const ringRotations = [
+      { x: 0,             y: 0,           z: 0 },
+      { x: Math.PI/8,     y: Math.PI/8,   z: 0 },
+      { x: -Math.PI/8,    y: Math.PI/8,   z: 0 },
+      { x: Math.PI/8,     y: -Math.PI/8,  z: 0 },
+      { x: -Math.PI/8,    y: -Math.PI/8,  z: 0 },
+      { x: Math.PI/8,     y: 0,           z: Math.PI/8 },
+      { x: -Math.PI/8,    y: 0,           z: -Math.PI/8 },
+      { x: 0,             y: Math.PI/8,   z: Math.PI/8 }
+    ];
+    
+    const ringContainers = [];
+    for (let i = 0; i < numRings; i++) {
+      const container = new THREE.Group();
+      const ringRadius = baseRadius + i * (2 * tubeRadius + gap);
+      
+      const path = new CircleCurve(ringRadius);
+      const geometry = new THREE.TubeGeometry(path, tubularSegments, tubeRadius, radialSegments, closed);
+      const material = new THREE.MeshStandardMaterial({
+        color: uniformColor,
+        metalness: 1.0,
+        roughness: 0.2
+      });
+      const ringMesh = new THREE.Mesh(geometry, material);
+      ringMesh.userData.rotationSpeed = 0.005 + 0.002 * Math.random();
+      ringMesh.userData.rotationAxis = new THREE.Vector3(0, 1, 0);
+      container.add(ringMesh);
+      
+      const rot = ringRotations[i % ringRotations.length];
+      container.rotation.set(rot.x, rot.y, rot.z);
+      
+      container.userData.accumulatedRotation = 0; 
+      container.userData.dynamicAxis = new THREE.Vector3(
+        Math.random(), Math.random(), Math.random()
+      ).normalize();
+      ringContainers.push(container);
+      ringsGroup.add(container);
+    }
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = Date.now() * 0.001;
+      
+      ringContainers.forEach(container => {
+        const delta = 0.01; 
+        container.rotateOnAxis(container.userData.dynamicAxis, delta);
+        container.userData.accumulatedRotation += delta;
+        if (container.userData.accumulatedRotation >= Math.PI * 2) {
+          container.userData.accumulatedRotation = 0;
+          container.userData.dynamicAxis = new THREE.Vector3(
+            Math.random(), Math.random(), Math.random()
+          ).normalize();
+        }
+        
+        container.children.forEach(ringMesh => {
+          ringMesh.rotateOnAxis(ringMesh.userData.rotationAxis, ringMesh.userData.rotationSpeed);
+        });
+      });
+      
+      ringsGroup.rotation.y += 0.02;
+      
+      // Update the sun's pulsation: make it even brighter.
+      const pulseAmplitude = 1.0;  // 100% variation.
+      const pulseFrequency = 3.0;  // Pulses at 3 Hz.
+      const pulse = 1 + pulseAmplitude * Math.sin(time * pulseFrequency);
+      sunSprite.scale.set(baseSunScale * pulse, baseSunScale * pulse, 1);
+      
+      renderer.render(scene, camera);
+    }
+    animate();
+    
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
-
-      // fetch the Dyson sphere model data
-      async function fetchModelData() {
-        const response = await fetch('/model');
-        return await response.json();
-      }
-
-      // dyson sphere mesh
-      async function createDysonSphere() {
-        const modelData = await fetchModelData();
-        const geometry = new THREE.BufferGeometry();
-        geometry.setFromPoints(modelData.vertices.map(v => new THREE.Vector3(...v)));
-        
-        geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(modelData.faces.flat()), 1));
-
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
-        return new THREE.Mesh(geometry, material);
-      }
-
-      async function init() {
-        const dysonSphere = await createDysonSphere();
-        scene.add(dysonSphere);
-        
-        camera.position.z = 5;
-
-        const animate = function () {
-          requestAnimationFrame(animate);
-
-          dysonSphere.rotation.x += 0.01;
-          dysonSphere.rotation.y += 0.01;
-
-          renderer.render(scene, camera);
-        };
-
-        animate();
-      }
-
-      init();
-    </script>
-  </body>
+    });
+  </script>
+</body>
 </html>
