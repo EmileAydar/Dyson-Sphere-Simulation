@@ -7,7 +7,6 @@ CORS(app)
 
 @app.route('/model', methods=['GET'])
 def model():
-    # Increase subdivisions for a smoother sphere (adjust radius as desired)
     vertices, faces = create_dyson_sphere(radius=10.0, subdivisions=3)
     return jsonify({'vertices': vertices, 'faces': faces})
 
@@ -53,7 +52,6 @@ def create_dyson_sphere(radius=10.0, subdivisions=3):
             [9, 8, 1],
         ])
 
-        # Normalize the initial vertices
         vertices = np.array([v/np.linalg.norm(v) for v in vertices])
 
         for _ in range(subdivisions):
@@ -65,7 +63,6 @@ def create_dyson_sphere(radius=10.0, subdivisions=3):
                 key = tuple(sorted((i, j)))
                 if key in midpoint_cache:
                     return midpoint_cache[key]
-                # Compute and normalize the midpoint
                 v = (vertices[i] + vertices[j]) / 2
                 v = v / np.linalg.norm(v)
                 vertices_list.append(v)
